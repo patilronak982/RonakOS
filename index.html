@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#142a52">
+<script src="https://js.puter.com/v2/"></script>
 <title>Ronak OS — Mini Smartphone</title>
 <style>
 :root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#f7f8ff;background:#10131b}
@@ -53,12 +54,12 @@ a{color:#fff}button:active{filter:brightness(.85);transform:translateY(1px)}
 (() => {
   const $ = id => document.getElementById(id);
   const screen = $('screen'), content = $('content');
-  let page='home', previous='home', notes='', calc='', phoneNo='', message='', browserUrl='', brightness=100;
+  let page='home', previous='home', notes='', calc='', phoneNo='', message='', browserUrl='', brightness=100, chatMessages=[], chatBusy=false;
   const appList = [
     ['phone','☎','Phone','#39bd7b'],['messages','✉','Messages','#43b8e8'],
     ['browser','◎','Browser','#e9a14a'],['camera','▣','Camera','#8873ed'],
     ['notes','✎','Notes','#f0c64b'],['calculator','＋','Calculator','#58b6a9'],
-    ['games','🎮','Games','#e76b86'],['settings','⚙','Settings','#788aa5'],
+    ['games','🎮','Games','#e76b86'],['chatbot','✦','AI Chatbot','#7057d9'],['settings','⚙','Settings','#788aa5'],
     ['about','ⓘ','About','#567bd5']
   ];
   const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -91,6 +92,25 @@ a{color:#fff}button:active{filter:brightness(.85);transform:translateY(1px)}
     if(id==='notes')shell('✎ Notes',`<p>Notes stay in this browser session. Copy anything important elsewhere.</p><textarea id="rpnote" class="field" rows="7" placeholder="Write your ideas here...">${esc(notes)}</textarea><div class="btnrow">${button('Save note','save')}${button('Copy note','copynote')}</div><div id="result" class="result"></div>`);
     if(id==='calculator')shell('＋ Calculator',`<p>Basic arithmetic calculator.</p>${field('rpcalc','e.g. (12+8)*3',calc)}<div class="calcgrid">${['7','8','9','/','4','5','6','*','1','2','3','-','0','.','⌫','+','(',')','%','='].map(n=>`<button data-calc="${n}">${n}</button>`).join('')}</div><div id="result" class="result"></div>`);
     if(id==='games')shell('🎮 Mini games',`<div class="panel"><b>Pixel Arcade</b><p>Want to play retro games? Open the standalone arcade if you saved it separately, or return to the chat where it was created.</p>${button('Back to home','home')}</div>`);
+    if(id==='chatbot') {
+      chatMessages = [];
+      shell('✦ AI Chatbot', `<div class="panel" style="padding:10px"><b>General AI assistant</b><p style="margin:5px 0 0">Text chat only. Ask questions, brainstorm, or get explanations.</p></div>
+        <div id="chatLog" role="log" aria-live="polite" style="height:285px;overflow:auto;display:flex;flex-direction:column;gap:9px;padding:4px 1px 10px">
+          <div class="chatbubble assistant">Hi! I'm your AI chatbot. What would you like help with?</div>
+        </div>
+        <form id="chatForm" style="margin-top:8px">
+          <textarea id="chatInput" class="field" rows="2" maxlength="3000" placeholder="Message your AI assistant..." required></textarea>
+          <div class="btnrow"><button class="btn" id="chatSend" type="submit">Send ➤</button><button class="btn" type="button" data-action="clearChat">New chat</button></div>
+        </form>
+        <div id="chatStatus" class="result" aria-live="polite">AI service requires an internet connection. First use may ask you to sign in to Puter.</div>`);
+      const log = $('chatLog');
+      if (log && !document.getElementById('chatStyle')) {
+        const style = document.createElement('style');
+        style.id='chatStyle';
+        style.textContent='.chatbubble{padding:9px 11px;border-radius:13px;max-width:92%;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.45}.chatbubble.user{align-self:flex-end;background:#ffffffdf;color:#182039}.chatbubble.assistant{align-self:flex-start;background:#ffffff20;border:1px solid #ffffff30}.chatbubble.error{border-color:#ffb0b0}';
+        document.head.appendChild(style);
+      }
+    }
     if(id==='settings')shell('⚙ Settings',`<div class="panel"><div style="font-size:12px;opacity:.8">DEVICE INFORMATION</div><p style="margin-bottom:0"><b>Device name - pineapple youphone</b></p></div><p>Wallpaper</p><div class="btnrow">${button('🌌 Purple','purple')}${button('🌊 Ocean','ocean')}${button('🌿 Forest','forest')}${button('🌅 Sunset','sunset')}</div><p>Screen brightness</p><input id="brightness" class="field" style="padding:0" type="range" min="55" max="100" value="${brightness}"><p>These settings change this demo screen only, not your actual phone.</p>`);
     if(id==='about')shell('ⓘ About Ronak OS',`<div class="panel"><b>Ronak OS 1.0</b><p>Interactive mini smartphone simulator.</p><p>Includes 9 demo apps and touch-friendly controls.</p><p>This is a website, not a full Android operating system. It cannot install Android apps, access mobile networks, or change your device settings.</p></div>`);
     clock();
@@ -110,6 +130,14 @@ a{color:#fff}button:active{filter:brightness(.85);transform:translateY(1px)}
     if(a==='camera'){r.textContent='If your browser allows it, use the link below to open the camera capture chooser.';r.innerHTML+=' <label class="btn" style="display:inline-block">Take photo<input type="file" accept="image/*" capture="environment" style="display:none" id="photo"></label>';return}
     if(a==='save'){notes=$('rpnote').value;r.textContent='Note saved for this open session.';return}
     if(a==='copynote'){notes=$('rpnote').value;if(navigator.clipboard?.writeText)navigator.clipboard.writeText(notes).then(()=>r.textContent='Note copied.').catch(()=>r.textContent='Copy was blocked by the browser.');else r.textContent='Clipboard is not available in this browser.';return}
+    if(a==='clearChat'){
+      chatMessages=[];
+      const log=$('chatLog'), status=$('chatStatus'), input=$('chatInput');
+      if(log)log.innerHTML='<div class="chatbubble assistant">New chat started. What would you like to ask?</div>';
+      if(status)status.textContent='Ready.';
+      if(input)input.value='';
+      return;
+    }
     const wallpapers={
       purple:'linear-gradient(155deg,#142a52,#624ba2 55%,#d07aa0)',
       ocean:'linear-gradient(155deg,#063c63,#168aad,#70d6ff)',
@@ -118,6 +146,48 @@ a{color:#fff}button:active{filter:brightness(.85);transform:translateY(1px)}
     };
     if(wallpapers[a]){screen.style.background=wallpapers[a];return}
   }
+  content.addEventListener('submit', async e => {
+    if(e.target.id!=='chatForm') return;
+    e.preventDefault();
+    const input=$('chatInput'), log=$('chatLog'), status=$('chatStatus'), send=$('chatSend');
+    const text=(input?.value||'').trim();
+    if(!text || chatBusy) return;
+    if(!window.puter || !puter.ai || typeof puter.ai.chat!=='function'){
+      if(status)status.textContent='AI library did not load. Check your internet connection and reload the website.';
+      return;
+    }
+    chatMessages.push({role:'user',content:text});
+    const userBubble=document.createElement('div');
+    userBubble.className='chatbubble user'; userBubble.textContent=text; log.appendChild(userBubble);
+    input.value=''; chatBusy=true; send.disabled=true; send.textContent='Thinking…';
+    if(status)status.textContent='AI is thinking…';
+    const thinking=document.createElement('div');
+    thinking.className='chatbubble assistant'; thinking.textContent='Thinking…'; log.appendChild(thinking);
+    log.scrollTop=log.scrollHeight;
+    try {
+      const messages=[
+        {role:'system',content:'You are a helpful, friendly general-purpose text-only AI assistant inside a small smartphone demo called Ronak OS. Answer clearly and safely. Do not claim to control the device, place calls, send messages, or access live information unless a tool explicitly provides it.'},
+        ...chatMessages
+      ];
+      const response=await puter.ai.chat(messages,{model:'openai/gpt-5.4-nano'});
+      let answer='';
+      if(typeof response==='string') answer=response;
+      else if(response?.message?.content!==undefined) {
+        const c=response.message.content;
+        answer=typeof c==='string'?c:Array.isArray(c)?c.map(x=>x.text||'').join(''):String(c);
+      } else answer=String(response?.text||response||'I could not produce a response.');
+      thinking.textContent=answer;
+      chatMessages.push({role:'assistant',content:answer});
+      if(status)status.textContent='Reply received.';
+    } catch(err) {
+      thinking.classList.add('error');
+      thinking.textContent='Sorry, I could not connect to the AI service. Check your internet connection and try again. First use may require signing in to Puter.';
+      if(status)status.textContent='AI request failed. Try again in a moment.';
+      chatMessages.pop();
+    } finally {
+      chatBusy=false; send.disabled=false; send.textContent='Send ➤'; log.scrollTop=log.scrollHeight;
+    }
+  });
   content.addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return;
     if(b.dataset.app){open(b.dataset.app);return}
@@ -150,4 +220,4 @@ a{color:#fff}button:active{filter:brightness(.85);transform:translateY(1px)}
 })();
 </script>
 </body>
-                                                    </html>
+</html>
